@@ -149,22 +149,65 @@ function createTriplexId(version: number, store: number, lower: string, upper: s
  */
 export
 function createTriplexIds(n: number, version: number, store: number, lower: string, upper: string): string[] {
-  // Initialize the identifiers array.
   let ids: string[] = [];
 
-  // Loop the required number of times.
-  while (ids.length < n) {
-    // Create an identifier between the boundaries.
-    let id = createTriplexId(version, store, lower, upper);
+  whileIds: while (ids.length < n) {
+      const MAX_PATH = 0xFFFFFFFFFFFF;
+      let id = '';
+      let lowerCount = lower ? Private.idTripletCount(lower) : 0;
+      let upperCount = upper ? Private.idTripletCount(upper) : 0;
+      let p = 1 ? lowerCount+upperCount===0 : Math.max(lowerCount, upperCount);
 
-    // Add the identifier to the array.
-    ids.push(id);
+      forCount: for (let i = 0; i < p; ++i) {
+          let lp: number;
+          let lc: number;
+          let ls: number;
+          if (i >= lowerCount) {
+            lp = 0;
+            lc = 0;
+            ls = 0;
+          } else {
+            lp = Private.idPathAt(lower, i);
+            lc = Private.idVersionAt(lower, i);
+            ls = Private.idStoreAt(lower, i);
+          }
+          let up: number;
+          let uc: number;
+          let us: number;
+          if (i >= upperCount) {
+            up = upperCount === 0 ? MAX_PATH + 1 : 0;
+            uc = 0;
+            us = 0;
+          } else {
+            up = Private.idPathAt(upper, i);
+            uc = Private.idVersionAt(upper, i);
+            us = Private.idStoreAt(upper, i);
+          }
 
-    // Update the lower boundary identifier.
-    lower = id;
-  }
+          // lower === upper
+          if (lp === up && lc === uc && ls === us) {
+            id += Private.createTriplet(lp, lc, ls);
+            continue forCount;
+          }
 
-  // Return the generated identifiers.
+          if ((up - lp - 1) >= (n - ids.length)) {
+              let paths = Private.generatePaths(n, lp, up)
+              for (let j = 0, m = n-ids.length; j < m; j++) {
+                  ids.push(id + Private.createTriplet(paths[j], version, store));
+              }
+              return ids;
+          }
+
+          id += Private.createTriplet(lp, lc, ls);
+          upperCount = 0;
+      } // forCount
+
+      let np = Private.generatePaths(1, 1, MAX_PATH);
+      id += Private.createTriplet(np[0], version, store);
+      ids.push(id.slice());
+      id = '';
+  } // whileIds
+
   return ids;
 }
 
@@ -281,5 +324,27 @@ namespace Private {
   export
   function randomPath(min: number, max: number): number {
     return min + Math.round(Math.random() * Math.sqrt(max - min));
+  }
+
+  /**
+   * Generate n random paths evenly spaced between min and max.
+   * 
+   * @param n - The number of paths to generate between min and max.
+   * @param min - The minimum path.
+   * @param max = The maximum path.
+   * 
+   * @returns An array of paths between min and max.
+   */
+  export
+  function generatePaths(n: number, min: number, max: number): number[] {
+      let m = max - min;
+      let delta = m/(n+1);
+      // console.log(m,n+1,m/(n+1),delta);
+      let paths = []
+      for (let i = 1; i <= n; i++) {
+          paths.push(Math.floor(min + i*delta));
+      }
+      // console.log(paths);
+      return paths
   }
 }
